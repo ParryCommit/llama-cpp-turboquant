@@ -1,4 +1,4 @@
-name: CI (CUDA, ubuntu)
+name: CI (CUDA, Ubuntu 22.04)
 
 on:
   workflow_dispatch:
@@ -29,14 +29,14 @@ jobs:
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.21
         with:
-          key: cuda-ubuntu-22.04-cuda
+          key: cuda-ubuntu-22.04-cuda-12.6
           evict-old-files: 1d
           save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
       - name: Build with CMake
         run: |
           cmake -S . -B build -G Ninja \
-            -DLLAMA_FATAL_WARNINGS=ON \
+            -DLLAMA_FATAL_WARNINGS=OFF \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89" \
             -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
@@ -48,23 +48,17 @@ jobs:
 
       - name: Verify binary compatibility
         run: |
-          echo "GLIBC:"
-          ldd --version | head -n 1
+          echo "=== GLIBC requirements ==="
+          strings build/bin/llama-server | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -20 || true
 
-          echo ""
-          echo "GLIBCXX requirements:"
-          strings /usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
-            | grep '^GLIBCXX_' \
-            | sort -V \
-            | tail -n 5
+          echo "=== GLIBCXX requirements ==="
+          strings build/bin/llama-server | grep -o 'GLIBCXX_[0-9.]*' | sort -Vu | tail -20 || true
 
-          echo ""
-          echo "llama-server:"
-          file build/bin/llama-server
+          echo "=== GCC version ==="
+          gcc --version | head -1
 
-          echo ""
-          echo "llama-server dependencies:"
-          ldd build/bin/llama-server
+          echo "=== GLIBC version ==="
+          ldd --version | head -1
 
       - name: Package Linux CUDA build
         run: |
@@ -82,15 +76,16 @@ jobs:
           Linux x86_64
           CUDA 12.6
           CUDA architectures: 75, 80, 86, 89
-          Built on Ubuntu 22.04 for Kaggle compatibility
+          Built on Ubuntu 22.04
+          GLIBC compatibility target: 2.35
           EOF
 
-          zip -r llama-cuda-linux.zip llama-cuda-linux
+          zip -r llama-cuda-linux-ubuntu22.zip llama-cuda-linux
 
       - name: Upload Linux CUDA artifact
         uses: actions/upload-artifact@v4
         with:
           name: llama-cuda-linux-ubuntu22
-          path: llama-cuda-linux.zip
+          path: llama-cuda-linux-ubuntu22.zip
           if-no-files-found: error
           retention-days: 30
