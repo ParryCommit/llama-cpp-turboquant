@@ -1,4 +1,10 @@
-cuda:
+name: CI (CUDA, ubuntu)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cuda:
     runs-on: ubuntu-24.04
     container: nvidia/cuda:12.6.2-devel-ubuntu24.04
 
@@ -32,7 +38,7 @@ cuda:
           cmake -S . -B build -G Ninja \
             -DLLAMA_FATAL_WARNINGS=ON \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CUDA_ARCHITECTURES="75;89" \
+            -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89" \
             -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
             -DGGML_NATIVE=OFF \
             -DGGML_CUDA=ON \
@@ -44,7 +50,7 @@ cuda:
         run: |
           ./build/bin/llama-server --version
 
-      - name: Package llama.cpp
+      - name: Package Linux CUDA build
         run: |
           mkdir -p llama-cuda-linux/bin
           mkdir -p llama-cuda-linux/lib
@@ -59,13 +65,7 @@ cuda:
           Upstream llama.cpp
           Linux x86_64
           CUDA 12.6
-          CUDA architectures: 75, 89
-
-          Main executable:
-          bin/llama-server
-
-          This package is intended to be used on Linux systems
-          with a compatible NVIDIA driver.
+          CUDA architectures: 75, 80, 86, 89
           EOF
 
           zip -r llama-cuda-linux.zip llama-cuda-linux
