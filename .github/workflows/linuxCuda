@@ -1,0 +1,79 @@
+  cuda:
+    runs-on: ubuntu-24.04
+    container: nvidia/cuda:12.6.2-devel-ubuntu24.04
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt update
+          apt install -y \
+            cmake \
+            build-essential \
+            ninja-build \
+            libgomp1 \
+            git \
+            libssl-dev \
+            zip
+
+      - name: ccache
+        uses: ggml-org/ccache-action@v1.2.21
+        with:
+          key: cuda-ubuntu-24.04-cuda
+          evict-old-files: 1d
+          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+
+      - name: Build with CMake
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DLLAMA_FATAL_WARNINGS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CUDA_ARCHITECTURES="75;89" \
+            -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
+            -DGGML_NATIVE=OFF \
+            -DGGML_CUDA=ON \
+            -DGGML_CUDA_CUB_3DOT2=ON
+
+          cmake --build build --config Release -j $(nproc)
+
+      - name: Verify llama-server
+        run: |
+          ./build/bin/llama-server --version
+
+      - name: Package llama.cpp
+        run: |
+          mkdir -p llama-cuda-linux/bin
+          mkdir -p llama-cuda-linux/lib
+
+          cp -a build/bin/. llama-cuda-linux/bin/
+
+          find build \
+            \( -name "*.so" -o -name "*.so.*" \) \
+            -exec cp -a {} llama-cuda-linux/lib/ \;
+
+          cat > llama-cuda-linux/README.txt <<'EOF'
+          Upstream llama.cpp
+          Linux x86_64
+          CUDA 12.6
+          CUDA architectures: 75, 89
+
+          Main executable:
+          bin/llama-server
+
+          This package is intended to be used on Linux systems
+          with a compatible NVIDIA driver.
+          EOF
+
+          zip -r llama-cuda-linux.zip llama-cuda-linux
+
+      - name: Upload Linux CUDA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llama-cuda-linux
+          path: llama-cuda-linux.zip
+          if-no-files-found: error
+          retention-days: 30
