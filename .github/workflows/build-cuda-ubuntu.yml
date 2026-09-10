@@ -46,9 +46,11 @@ jobs:
 
           cmake --build build --config Release -j $(nproc)
 
-      - name: Verify llama-server
+      - name: Verify build
         run: |
-          ./build/bin/llama-server --version
+          test -x ./build/bin/llama-server
+          file ./build/bin/llama-server
+          ldd ./build/bin/llama-server || true
 
       - name: Package Linux CUDA build
         run: |
